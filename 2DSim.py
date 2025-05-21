@@ -22,18 +22,18 @@ By Samuel Erne, 2025
 '''
 
 def main():
-    folder = r"D:\Data\2D_diffusion"        # Set folder and filename for saving data
+    folder = r"E:\Data\2D_diffusion"        # Set folder and filename for saving data
 
     # Parameters
     Deff = 1               # unused in our nonlinear definition below
     L = 10.0               # Domain from -L to L in both x and y
-    N = 50                # Number of grid points in each direction
+    N = 100                # Number of grid points in each direction
     dx = 2 * L / (N-1)     # Grid spacing
     x = np.linspace(-L, L, N)
     y = x.copy()
     X, Y = np.meshgrid(x, y)
     sig = 0.5
-    m = 2.0              # Degree of nonlinearity
+    m = 10.0              # Degree of nonlinearity
     scale_factor = 1.0
 
     # Define non-linear diffusion term: D(u) = u^m
@@ -83,7 +83,7 @@ def main():
 
     # Set simulation time and time evaluation
     t_start = 0.0
-    t_end = 1500.0   
+    t_end = 500000.0   
     t_eval = np.linspace(t_start, t_end, 201)
 
     print("Solving PDE...")
