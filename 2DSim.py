@@ -12,24 +12,28 @@ from tqdm import tqdm
 This is a 2D siumulation for nonlinear charge ensity diffusion.
 The diffusion term is defined as D(u) = u^m, where m is the degree of nonlinearity.
 
-The user should specify the folder variable as the location to save the data.
+The user should specify the folder variable as the location to save data.
+
+For better performace on devices with limited  memory/CPU power, set N to ~50.
+This is the "resolution" of the simulation. Lower N values will be fewer grid points for 
+the simulation to compute at each timestep. 
 
 By Samuel Erne, 2025
 '''
 
 def main():
-    folder = r"E:\Data\2D_diffusion"        # Set folder and filename for saving data (Moved from line 94)
+    folder = r"D:\Data\2D_diffusion"        # Set folder and filename for saving data
 
     # Parameters
     Deff = 1               # unused in our nonlinear definition below
     L = 10.0               # Domain from -L to L in both x and y
-    N = 100                # Number of grid points in each direction
+    N = 50                # Number of grid points in each direction
     dx = 2 * L / (N-1)     # Grid spacing
     x = np.linspace(-L, L, N)
     y = x.copy()
     X, Y = np.meshgrid(x, y)
     sig = 0.5
-    m = 1.0              # Degree of nonlinearity
+    m = 2.0              # Degree of nonlinearity
     scale_factor = 1.0
 
     # Define non-linear diffusion term: D(u) = u^m
@@ -148,17 +152,43 @@ def main():
     threshold = 0.01        # Threshold for defining the front
     front_radii = []
 
+    '''
     for ti, t_val in tqdm(enumerate(sol.t), total=len(sol.t), desc="Tracking Fronts"):
         snapshot = sol.y[:, ti].reshape((N, N))
         R = np.sqrt(X**2 + Y**2)
         mask = snapshot >= threshold
         front_radius = np.max(R[mask]) if mask.any() else 0.0
         front_radii.append(front_radius)
+    '''
 
-    # Avoid t=0 to prevent log(0)
-    mask = sol.t > 0
-    t_fit = sol.t[mask]
-    front_fit = np.array(front_radii)[mask]
+    for ti, t_val in tqdm(enumerate(sol.t), total=len(sol.t), desc="Processing front radii"):
+        snapshot = sol.y[:, ti].reshape((N, N))
+
+        interior_mask = np.ones_like(snapshot, dtype=bool)
+        interior_mask[0, :] = interior_mask[-1, :] = interior_mask[:, 0] = interior_mask[:, -1] = False
+
+        mask = (snapshot >= threshold) & interior_mask
+
+        if mask.any():
+            current_radius = np.max(np.sqrt(X[mask]**2 + Y[mask]**2))
+        else:
+            current_radius = front_radii[-1] if front_radii else 0.0
+
+        # Enforce monotonic increase; necessary for 0 flux boundary conditions
+        if front_radii:
+            current_radius = max(current_radius, front_radii[-1])
+
+        front_radii.append(current_radius)
+
+    margin = dx 
+    cutoff = L - margin
+
+    # Create a mask that excludes t=0 and times when the front is near the boundary
+    fit_mask = (sol.t > 0) & (np.array(front_radii) < cutoff)
+
+    t_fit = sol.t[fit_mask]
+    front_fit = np.array(front_radii)[fit_mask]
+
 
     # Take logarithms
     log_t = np.log(t_fit)
@@ -172,7 +202,7 @@ def main():
 
     plt.figure()
     plt.plot(log_t, log_front, 'ko', label="Data (log-scale)")
-    plt.plot(log_t, a * log_t + intercept, 'r-', label=f"Fit (slope = {a:.3f})")
+    plt.plot(log_t, a * log_t + intercept, 'r-', label=f"Fit (a = {a:.3f})")
     plt.xlabel("log(Time)")
     plt.ylabel("log(Front Radius)")
     plt.legend()
