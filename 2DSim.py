@@ -33,7 +33,7 @@ def main():
     y = x.copy()
     X, Y = np.meshgrid(x, y)
     sig = 0.5
-    m = 10.0              # Degree of nonlinearity
+    m = 1.0              # Degree of nonlinearity
     scale_factor = 1.0
 
     # Define non-linear diffusion term: D(u) = u^m
@@ -83,7 +83,7 @@ def main():
 
     # Set simulation time and time evaluation
     t_start = 0.0
-    t_end = 500000.0   
+    t_end = 750.0   
     t_eval = np.linspace(t_start, t_end, 201)
 
     print("Solving PDE...")
@@ -262,6 +262,30 @@ def main():
         print("Data saved to", trial_folder)
     else:
         print("Run data not saved.")
+
+    root.destroy()
+
+    print('Please select save option for front data...')
+    root = tk.Tk()
+    root.withdraw()
+
+    save_front = messagebox.askyesno("Save Front Data", "Do you want to save the front data points used in the log plot?")
+    if save_front:
+        if not os.path.exists(folder):
+            os.makedirs(folder)
+        date = datetime.now().strftime("%Y%m%d_%H%M%S")
+        front_filename = os.path.join(folder, f"front_data_{date}.csv")
+        # Create a DataFrame with time, front radius, and their logarithms
+        front_df = pd.DataFrame({
+            "Time": t_fit,
+            "FrontRadius": front_fit,
+            "logTime": np.log(t_fit),
+            "logFront": np.log(front_fit)
+        })
+        front_df.to_csv(front_filename, index=False)
+        print("Front data saved to", front_filename)
+    else:
+        print("Front data not saved.")
 
     root.destroy()
 
