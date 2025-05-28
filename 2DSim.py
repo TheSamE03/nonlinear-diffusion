@@ -7,6 +7,7 @@ from datetime import datetime
 import tkinter as tk
 from tkinter import messagebox
 from tqdm import tqdm 
+import tkinter.simpledialog as simpledialog
 
 '''
 This is a 2D siumulation for nonlinear charge ensity diffusion.
@@ -22,12 +23,12 @@ By Samuel Erne, 2025
 '''
 
 def main():
-    folder = r"E:\Data\2D_diffusion"        # Set folder and filename for saving data
+    folder = r"D:\Data\2D_diffusion"        # Set folder and filename for saving data
 
     # Parameters
-    Deff = 1               # unused in our nonlinear definition below
+    D_0 = 1.0               # Diffusion coefficient
     L = 10.0               # Domain from -L to L in both x and y
-    N = 100                # Number of grid points in each direction
+    N = 50                # Number of grid points in each direction
     dx = 2 * L / (N-1)     # Grid spacing
     x = np.linspace(-L, L, N)
     y = x.copy()
@@ -36,9 +37,37 @@ def main():
     m = 1.0              # Degree of nonlinearity
     scale_factor = 1.0
 
-    # Define non-linear diffusion term: D(u) = u^m
-    def D(u):
-        return u**m
+    # ----- Condition Selection -----
+    def ask_conditions():
+        root = tk.Tk()
+        root.title("Select Conditions")
+        
+        # Initial condition
+        tk.Label(root, text="Select initial condition type:").pack(pady=5)
+        init_var = tk.StringVar(value="step")
+        tk.OptionMenu(root, init_var, "step", "gaussian").pack(pady=5)
+        
+        # Boundary condition
+        tk.Label(root, text="Select boundary condition type:").pack(pady=5)
+        bc_var = tk.StringVar(value="neumann")
+        tk.OptionMenu(root, bc_var, "neumann", "dirichlet").pack(pady=5)
+
+        tk.Label(root, text="Enter degree of nonlinearity:").pack(pady=5)
+        m = tk.Entry(root)
+        m.insert(0, "1.0")
+        m.pack(pady=5)
+
+        tk.Label(root, text="Enter diffusion coefficient:").pack(pady=5)
+        D_0 = tk.Entry(root)
+        D_0.insert(0, "1.0")
+        D_0.pack(pady=5)
+        
+        tk.Button(root, text="OK", command=root.destroy).pack(pady=10)
+        root.mainloop()
+        
+        return init_var.get(), bc_var.get()
+
+    init_choice, bc_choice = ask_conditions()
 
     # Step function: density=1 inside a square |x|,|y| <=1 and 0 elsewhere.
     def initial_condition_step_2d(X, Y):
@@ -51,8 +80,14 @@ def main():
     def initial_condition_gaussian_2d(X, Y):
         return np.exp(-((X**2 + Y**2) / (2 * sig**2)))
     
-    n0 = initial_condition_step_2d(X, Y)
-    # n0 = initial_condition_gaussian_2d(X, Y)
+    if init_choice and init_choice.lower() == 'gaussian':
+        n0 = initial_condition_gaussian_2d(X, Y)
+    else:
+        n0 = initial_condition_step_2d(X, Y)
+
+    # Define non-linear diffusion term: D(u) = u^m
+    def D(u):
+        return D_0*u**m
 
     # Flatten the 2D array since solve_ivp requires a 1D state vector. 
     n0_flat = n0.ravel()
@@ -73,11 +108,20 @@ def main():
         div_flux = np.zeros_like(u)
         div_flux[1:-1, :] += (flux_x[2:, :] - flux_x[:-2, :]) / (2 * dx)
         div_flux[:, 1:-1] += (flux_y[:, 2:] - flux_y[:, :-2]) / (2 * dx)
-        # For Neumann boundaries, assume the derivative is zero.
-        div_flux[0, :] = div_flux[1, :]
-        div_flux[-1, :] = div_flux[-2, :]
-        div_flux[:, 0] = div_flux[:, 1]
-        div_flux[:, -1] = div_flux[:, -2]
+
+        if bc_choice and bc_choice.lower() == 'dirichlet':
+            # For Dirichlet (0 density), force the time derivative to zero at the boundaries.
+            div_flux[0, :] = 0
+            div_flux[-1, :] = 0
+            div_flux[:, 0] = 0
+            div_flux[:, -1] = 0
+        if bc_choice and bc_choice.lower() == 'nuemman':
+            # For Neumann (0 flux), use central differences to mimic zero derivative:
+            div_flux[0, :] = div_flux[1, :]
+            div_flux[-1, :] = div_flux[-2, :]
+            div_flux[:, 0] = div_flux[:, 1]
+            div_flux[:, -1] = div_flux[:, -2]
+
         # Return the time derivative (flattened)
         return div_flux.ravel()
 
@@ -97,23 +141,6 @@ def main():
     data = np.column_stack((sol.t, sol.y.T))
     date = datetime.now().strftime("%Y%m%d_%H%M%S")
     header = "Time," + ",".join([f"u_{i}" for i in range(N*N)])
-    
-
-    '''
-    root = tk.Tk()
-    root.withdraw()
-    save_data = messagebox.askyesno("Save Run Data", "Do you want to save this run's data?")
-    if save_data:
-        if not os.path.exists(folder):
-            os.makedirs(folder)
-        filename = os.path.join(folder, f"dataset_2d_{date}.csv")
-        np.savetxt(filename, data, delimiter=",", header=header, comments="")
-        print("Data saved to", filename)
-    else:
-        print("Run data not saved.")
-    root.destroy()
-
-    '''
 
     print("Formatting data...")
 
@@ -125,27 +152,6 @@ def main():
                 rows.append({"Time": t_val, "X": x[i], "Y": y[k], "U": snapshot[i, k]})
                 
     df = pd.DataFrame(rows)
-
-    '''
-
-    print('Please select save option...')
-    root = tk.Tk()
-    root.withdraw()
-
-    save_data = messagebox.askyesno("Save Data", "Do you want to save the data from this trial?")
-    if save_data:
-        if not os.path.exists(folder):
-            os.makedirs(folder)
-        date = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = os.path.join(folder, f"dataset_2d_tidy_{date}.csv")
-        df.to_csv(filename, index=False)
-        print("Data saved to", filename)
-    else:
-        print("Run data not saved.")
-
-    root.destroy()
-
-    '''
 
     # ----- Front Tracking -----
 
@@ -288,6 +294,38 @@ def main():
         print("Front data not saved.")
 
     root.destroy()
+
+    fig, axs = plt.subplots(nrows=3, ncols=1, figsize=(10, 18))
+
+    # Subplot 1: Log-Log Plot of Front Radius vs Time with fit line
+    axs[0].plot(log_t, log_front, 'ko', label="Data (log-scale)")
+    axs[0].plot(log_t, a * log_t + intercept, 'r-', label=f"Fit (a = {a:.3f})")
+    axs[0].set_xlabel("log(Time)")
+    axs[0].set_ylabel("log(Front Radius)")
+    axs[0].set_aspect('equal', adjustable='box')
+    axs[0].legend()
+    axs[0].set_title("Log-Log Plot of Front Radius vs Time")
+
+    # Subplot 2: Front Radius vs Time Plot
+    axs[1].plot(sol.t, comparison, 'r-', label="t^a")
+    axs[1].plot(sol.t, front_radii, 'k--', label="Front Radius")
+    axs[1].set_xlabel("Time")
+    axs[1].set_ylabel("Front Radius")
+    axs[1].set_title("Front Radius vs Time")
+    axs[1].set_aspect('equal', adjustable='box')
+
+    axs[1].legend()
+
+    # Subplot 3: Final State Contour Plot
+    c = axs[2].contourf(X, Y, final_state, levels=50, cmap='viridis')
+    fig.colorbar(c, ax=axs[2], label="Density")
+    axs[2].set_xlabel("x")
+    axs[2].set_ylabel("y")
+    axs[2].set_title(f"State after {t_end} Time Units")
+    axs[2].set_aspect('equal', adjustable='box')
+
+    plt.tight_layout(pad=3.0)
+    plt.show()
 
 if __name__ == "__main__":
     main()
