@@ -12,19 +12,27 @@ Open a powershell terminal emulator window.
 
 To download the necessary files run the following command
 
-```git clone https://github.com/TheSamE03/nonlinear-diffusion.git```
+```
+git clone https://github.com/TheSamE03/nonlinear-diffusion.git
+```
 
 Open the newly installed dirtectory
 
-```cd nonlinear-diffusion```
+```
+cd nonlinear-diffusion
+```
 
 Install dependencies
 
-```pip install requirements.txt```
+```
+pip install requirements.txt
+```
 
 Run the simulation
 
-```python 2DSim.py```
+```
+python 2DSim.py
+```
 
 You will be prompted to chose your desired initial conditions, boundary conditions, and some other parameters. Once these are selected click "ok" and the simulation will begin solving the PDE at each grid point for each timestep. This is an intensive process and the capabilities of the host computer will be a key factor in efficiency of the simulation. 
 
