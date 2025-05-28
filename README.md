@@ -12,7 +12,7 @@ Open a powershell terminal emulator window.
 
 To download the necessary files run the following command
 
-```git clone <url>```
+```git clone https://github.com/TheSamE03/nonlinear-diffusion.git```
 
 Open the newly installed dirtectory
 
